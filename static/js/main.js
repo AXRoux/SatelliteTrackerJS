@@ -167,9 +167,9 @@ function getRandomColor() {
     return color;
 }
 
-function fetchSatellites(category, searchQuery = '') {
-    console.log('Fetching satellites for category:', category, 'with search query:', searchQuery);
-    fetch(`/api/satellites/${category}?limit=${satelliteLimit}&search=${searchQuery}`)
+function fetchSatellites(category) {
+    console.log('Fetching satellites for category:', category);
+    fetch(`/api/satellites/${category}?limit=${satelliteLimit}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -254,11 +254,6 @@ function displayErrorMessage(message) {
     document.getElementById('error-container').textContent = message;
 }
 
-function updateStatusMessage(message) {
-    const statusMessageElement = document.getElementById('status-message');
-    statusMessageElement.textContent = message;
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM content loaded');
     initMap();
@@ -266,27 +261,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const categorySelect = document.getElementById('category');
     categorySelect.addEventListener('change', (event) => {
-        const searchInput = document.getElementById('search');
-        fetchSatellites(event.target.value, searchInput.value);
+        fetchSatellites(event.target.value);
     });
 
     const limitInput = document.getElementById('satellite-limit');
     limitInput.addEventListener('change', (event) => {
         satelliteLimit = parseInt(event.target.value) || 5;
-        const searchInput = document.getElementById('search');
-        fetchSatellites(categorySelect.value, searchInput.value);
-    });
-
-    const searchInput = document.getElementById('search');
-    const searchButton = document.getElementById('search-btn');
-    searchButton.addEventListener('click', () => {
-        fetchSatellites(categorySelect.value, searchInput.value);
-    });
-
-    searchInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            fetchSatellites(categorySelect.value, searchInput.value);
-        }
+        fetchSatellites(categorySelect.value);
     });
 
     fetchSatellites(0);
