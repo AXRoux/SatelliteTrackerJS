@@ -57,6 +57,7 @@ function updateSatellitePositions() {
                     initPathLine(satid, latlng);
                 }
 
+                // Fetch and update trajectory
                 updateTrajectory(satid);
             })
             .catch(error => {
@@ -253,77 +254,9 @@ function displayErrorMessage(message) {
     document.getElementById('error-container').textContent = message;
 }
 
-function searchSatellites() {
-    const searchInput = document.getElementById('search-input');
-    const searchResults = document.getElementById('search-results');
-    const query = searchInput.value.trim();
-    if (query) {
-        console.log('Searching satellites with query:', query);
-        
-        searchResults.innerHTML = '<p>Searching satellites...</p>';
-        
-        fetch(`/api/search?query=${encodeURIComponent(query)}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Search results:', data);
-                if (data.above && data.above.length > 0) {
-                    searchResults.innerHTML = '<h3>Search Results:</h3>';
-                    data.above.forEach(satellite => {
-                        searchResults.innerHTML += `
-                            <div class="search-result">
-                                <h4>${satellite.satname}</h4>
-                                <p>NORAD ID: ${satellite.satid}</p>
-                                <p>International Designator: ${satellite.intDesignator}</p>
-                                <p>Launch Date: ${satellite.launchDate}</p>
-                            </div>
-                        `;
-                    });
-                } else {
-                    searchResults.innerHTML = '<p>No satellites found for the given search query.</p>';
-                }
-            })
-            .catch(error => {
-                console.error('Error searching satellites:', error);
-                searchResults.innerHTML = `<p>Error searching satellites: ${error.message}</p>`;
-                displayErrorMessage(`Error searching satellites: ${error.message}`);
-            });
-    } else {
-        searchResults.innerHTML = '<p>Please enter a search query.</p>';
-    }
-}
-
-function initTabNavigation() {
-    const tabButtons = document.querySelectorAll('.tab-button');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const tabName = button.getAttribute('data-tab');
-            
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            tabContents.forEach(content => content.classList.remove('active'));
-
-            button.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
-
-            if (tabName === 'real-time-tracker') {
-                if (!map) {
-                    initMap();
-                }
-                map.invalidateSize();
-            }
-        });
-    });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM content loaded');
-    initTabNavigation();
+    initMap();
     populateCategories();
     
     const categorySelect = document.getElementById('category');
@@ -335,16 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
     limitInput.addEventListener('change', (event) => {
         satelliteLimit = parseInt(event.target.value) || 5;
         fetchSatellites(categorySelect.value);
-    });
-
-    const searchButton = document.getElementById('search-button');
-    searchButton.addEventListener('click', searchSatellites);
-
-    const searchInput = document.getElementById('search-input');
-    searchInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            searchSatellites();
-        }
     });
 
     fetchSatellites(0);

@@ -18,80 +18,19 @@ h1 {
     margin: 10px 0;
 }
 
-#tab-navigation {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 10px;
-}
-
-.tab-button {
-    padding: 10px 20px;
-    margin: 0 5px;
-    background-color: #f0f0f0;
-    border: none;
-    cursor: pointer;
-}
-
-.tab-button.active {
-    background-color: #4CAF50;
-    color: white;
-}
-
-.tab-content {
-    display: none;
-    flex-grow: 1;
-}
-
-.tab-content.active {
-    display: block;
-}
-
-#controls, #search-controls {
+#controls {
     display: flex;
     justify-content: center;
     align-items: center;
     margin-bottom: 10px;
-    flex-wrap: wrap;
 }
 
-#category, #satellite-limit, #search-input {
-    margin: 0 5px;
-    padding: 5px;
-}
-
-#search-button {
-    margin: 0 5px;
-    padding: 5px 10px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    cursor: pointer;
-}
-
-#search-button:hover {
-    background-color: #45a049;
+#category {
+    margin-left: 10px;
 }
 
 #map {
-    height: calc(100vh - 150px);
-}
-
-#search-results {
-    padding: 20px;
-    overflow-y: auto;
-    max-height: calc(100vh - 200px);
-}
-
-.search-result {
-    background-color: #f9f9f9;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 10px;
-    margin-bottom: 10px;
-}
-
-.search-result h4 {
-    margin-top: 0;
+    flex-grow: 1;
 }
 
 .satellite-icon {
@@ -116,26 +55,17 @@ h1 {
     margin-top: 2px;
 }
 
-#error-container {
-    color: red;
-    padding: 10px;
-    margin: 10px 0;
-    background-color: #ffeeee;
-    border: 1px solid #ff0000;
-    text-align: center;
-}
-
 @media (max-width: 600px) {
     h1 {
         font-size: 1.5em;
     }
 
-    #controls, #search-controls {
+    #controls {
         flex-direction: column;
     }
 
-    #category, #satellite-limit, #search-input, #search-button {
-        margin: 5px 0;
-        width: 100%;
+    #category {
+        margin-left: 0;
+        margin-top: 5px;
     }
 }
