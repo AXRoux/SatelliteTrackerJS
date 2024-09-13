@@ -52,6 +52,7 @@ function updateSatellitePositions() {
                     console.log('Creating new marker for satellite:', satid);
                     const marker = L.marker(latlng, { icon: createSatelliteIcon(satellites[satid]) }).addTo(map);
                     marker.bindPopup(createPopupContent(satellites[satid], position));
+                    marker.on('click', () => fetchDetailedInfo(satid));
                     markers[satid] = marker;
                     initPathLine(satid, latlng);
                 }
@@ -75,7 +76,40 @@ function createPopupContent(satellite, position) {
         <p>Latitude: ${position.satlatitude.toFixed(4)}</p>
         <p>Longitude: ${position.satlongitude.toFixed(4)}</p>
         <p>Altitude: ${position.sataltitude.toFixed(2)} km</p>
+        <div id="detailed-info-${satellite.satid}">
+            <button onclick="fetchDetailedInfo(${satellite.satid})">Load Detailed Info</button>
+        </div>
     `;
+}
+
+function fetchDetailedInfo(satid) {
+    console.log('Fetching detailed info for satellite:', satid);
+    fetch(`/api/satellite/${satid}/info`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Received detailed info for satellite:', satid, data);
+            updatePopupWithDetailedInfo(satid, data);
+        })
+        .catch(error => {
+            console.error('Error fetching detailed satellite info:', satid, error);
+            displayErrorMessage(`Error fetching detailed satellite info: ${error.message}`);
+        });
+}
+
+function updatePopupWithDetailedInfo(satid, data) {
+    const detailedInfoContainer = document.getElementById(`detailed-info-${satid}`);
+    if (detailedInfoContainer) {
+        detailedInfoContainer.innerHTML = `
+            <h4>Detailed Information</h4>
+            <p>TLE Line 1: ${data.tle.split('\r\n')[0]}</p>
+            <p>TLE Line 2: ${data.tle.split('\r\n')[1]}</p>
+        `;
+    }
 }
 
 function initPathLine(satid, latlng) {
