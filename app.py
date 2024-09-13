@@ -44,6 +44,21 @@ def get_satellite_position(satid):
         app.logger.error(f"Error fetching satellite position: {str(e)}")
         return jsonify({"error": "Failed to fetch satellite position"}), 500
 
+@app.route('/api/satellite/<int:satid>/trajectory')
+def get_satellite_trajectory(satid):
+    seconds = request.args.get('seconds', default=300, type=int)
+    url = f"https://api.n2yo.com/rest/v1/satellite/positions/{satid}/{app.config['OBSERVER_LAT']}/{app.config['OBSERVER_LON']}/{app.config['OBSERVER_ALT']}/{seconds}/&apiKey={app.config['N2YO_API_KEY']}"
+    app.logger.debug(f"Fetching satellite trajectory from URL: {url}")
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        app.logger.info(f"Fetched satellite trajectory: {json.dumps(data)}")
+        return jsonify(data)
+    except requests.RequestException as e:
+        app.logger.error(f"Error fetching satellite trajectory: {str(e)}")
+        return jsonify({"error": "Failed to fetch satellite trajectory"}), 500
+
 @app.route('/api/categories')
 def get_categories():
     categories = [

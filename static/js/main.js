@@ -2,6 +2,7 @@ let map;
 let satellites = {};
 let markers = {};
 let pathLines = {};
+let trajectoryLines = {};
 let satelliteLimit = 5;
 
 function initMap() {
@@ -54,6 +55,9 @@ function updateSatellitePositions() {
                     markers[satid] = marker;
                     initPathLine(satid, latlng);
                 }
+
+                // Fetch and update trajectory
+                updateTrajectory(satid);
             })
             .catch(error => {
                 console.error('Error updating satellite position:', satid, error);
@@ -88,6 +92,38 @@ function updatePathLine(satid, latlng) {
     }
 }
 
+function updateTrajectory(satid) {
+    console.log('Updating trajectory for satellite:', satid);
+    fetch(`/api/satellite/${satid}/trajectory?seconds=300`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Received trajectory data for satellite:', satid, data);
+            if (!data.positions || data.positions.length === 0) {
+                console.error('No trajectory data received for satellite:', satid);
+                return;
+            }
+
+            const trajectoryPoints = data.positions.map(pos => [pos.satlatitude, pos.satlongitude]);
+
+            if (trajectoryLines[satid]) {
+                console.log('Updating existing trajectory line for satellite:', satid);
+                trajectoryLines[satid].setLatLngs(trajectoryPoints);
+            } else {
+                console.log('Creating new trajectory line for satellite:', satid);
+                trajectoryLines[satid] = L.polyline(trajectoryPoints, {color: getRandomColor(), weight: 2, opacity: 0.7, dashArray: '5, 5'}).addTo(map);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating satellite trajectory:', satid, error);
+            displayErrorMessage(`Error updating satellite trajectory: ${error.message}`);
+        });
+}
+
 function getRandomColor() {
     const letters = '0123456789ABCDEF';
     let color = '#';
@@ -120,6 +156,11 @@ function fetchSatellites(category) {
                     console.log('Removing existing path line for satellite:', satid);
                     map.removeLayer(pathLines[satid]);
                     delete pathLines[satid];
+                });
+                Object.keys(trajectoryLines).forEach(satid => {
+                    console.log('Removing existing trajectory line for satellite:', satid);
+                    map.removeLayer(trajectoryLines[satid]);
+                    delete trajectoryLines[satid];
                 });
 
                 data.above.forEach(satellite => {
