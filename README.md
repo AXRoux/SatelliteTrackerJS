@@ -1,4 +1,6 @@
 # Real-Time Satellite Tracker
+Built and paying respect to https://hackasat.com/ for their aerospace innovation
+API Key still applied but free-version so rate limiting applied - do not leave API keys in an actual production environment.
 
 ## Project Description
 This is a long-term aerospace reconnaissance project that aims to provide real-time tracking and visualization of satellites using data from the N2YO API. The application displays satellite positions on an interactive map and provides detailed information about each satellite.
