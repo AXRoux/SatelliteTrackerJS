@@ -3,12 +3,17 @@ import requests
 import json
 from config import Config
 import logging
+import time
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
+
+# Add a simple cache
+cache = {}
+CACHE_DURATION = 300  # 5 minutes
 
 @app.route('/')
 def index():
@@ -17,25 +22,54 @@ def index():
 @app.route('/api/satellites/<int:category>')
 def get_satellites(category):
     limit = request.args.get('limit', default=5, type=int)
+    search_query = request.args.get('search', default='', type=str)
     url = f"https://api.n2yo.com/rest/v1/satellite/above/{app.config['OBSERVER_LAT']}/{app.config['OBSERVER_LON']}/{app.config['OBSERVER_ALT']}/90/{category}/&apiKey={app.config['N2YO_API_KEY']}"
-    app.logger.debug(f"Fetching satellites from URL: {url}")
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        data['above'] = data['above'][:limit]  # Limit the number of satellites
-        app.logger.info(f"Fetched satellite data: {json.dumps(data)}")
-        return jsonify(data)
-    except requests.RequestException as e:
-        app.logger.error(f"Error fetching satellite data: {str(e)}")
-        return jsonify({"error": "Failed to fetch satellite data"}), 500
+    
+    # Check cache first
+    cache_key = f"category_{category}"
+    if cache_key in cache and time.time() - cache[cache_key]['timestamp'] < CACHE_DURATION:
+        app.logger.info(f"Returning cached data for category {category}")
+        data = cache[cache_key]['data']
+    else:
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'above' not in data:
+                app.logger.error(f"Unexpected API response structure: {data}")
+                return jsonify({"error": "Unexpected API response structure"}), 500
+            
+            # Update cache
+            cache[cache_key] = {
+                'timestamp': time.time(),
+                'data': data
+            }
+            
+            app.logger.info(f"Fetched and cached satellite data for category {category}")
+        except requests.RequestException as e:
+            app.logger.error(f"Error fetching satellite data: {str(e)}")
+            
+            # Check if we have cached data to return as fallback
+            if cache_key in cache:
+                app.logger.info(f"Returning stale cached data for category {category}")
+                data = cache[cache_key]['data']
+            else:
+                return jsonify({"error": "Failed to fetch satellite data"}), 500
+
+    # Filter satellites based on search query
+    if search_query:
+        data['above'] = [sat for sat in data['above'] if search_query.lower() in sat['satname'].lower()]
+
+    data['above'] = data['above'][:limit]
+    return jsonify(data)
 
 @app.route('/api/satellite/<int:satid>')
 def get_satellite_position(satid):
     url = f"https://api.n2yo.com/rest/v1/satellite/positions/{satid}/{app.config['OBSERVER_LAT']}/{app.config['OBSERVER_LON']}/{app.config['OBSERVER_ALT']}/1/&apiKey={app.config['N2YO_API_KEY']}"
     app.logger.debug(f"Fetching satellite position from URL: {url}")
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         app.logger.info(f"Fetched satellite position: {json.dumps(data)}")
@@ -50,7 +84,7 @@ def get_satellite_trajectory(satid):
     url = f"https://api.n2yo.com/rest/v1/satellite/positions/{satid}/{app.config['OBSERVER_LAT']}/{app.config['OBSERVER_LON']}/{app.config['OBSERVER_ALT']}/{seconds}/&apiKey={app.config['N2YO_API_KEY']}"
     app.logger.debug(f"Fetching satellite trajectory from URL: {url}")
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         app.logger.info(f"Fetched satellite trajectory: {json.dumps(data)}")
@@ -64,7 +98,7 @@ def get_satellite_info(satid):
     url = f"https://api.n2yo.com/rest/v1/satellite/tle/{satid}&apiKey={app.config['N2YO_API_KEY']}"
     app.logger.debug(f"Fetching detailed satellite info from URL: {url}")
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         app.logger.info(f"Fetched detailed satellite info: {json.dumps(data)}")
