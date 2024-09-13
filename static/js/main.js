@@ -4,6 +4,9 @@ let markers = {};
 let pathLines = {};
 let trajectoryLines = {};
 let satelliteLimit = 5;
+let retryCount = 0;
+const maxRetries = 5;
+const baseDelay = 1000; // 1 second
 
 function initMap() {
     console.log('Initializing map');
@@ -24,47 +27,40 @@ function createSatelliteIcon(satellite) {
     });
 }
 
-function updateSatellitePositions() {
+async function updateSatellitePositions() {
     console.log('Updating satellite positions');
-    Object.keys(satellites).slice(0, satelliteLimit).forEach(satid => {
-        fetch(`/api/satellite/${satid}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Received position data for satellite:', satid, data);
-                if (!data.positions || data.positions.length === 0) {
-                    console.error('No position data received for satellite:', satid);
-                    return;
-                }
-                const position = data.positions[0];
-                const latlng = [position.satlatitude, position.satlongitude];
-                
-                if (markers[satid]) {
-                    console.log('Updating existing marker for satellite:', satid);
-                    markers[satid].setLatLng(latlng);
-                    markers[satid].getPopup().setContent(createPopupContent(satellites[satid], position));
-                    updatePathLine(satid, latlng);
-                } else {
-                    console.log('Creating new marker for satellite:', satid);
-                    const marker = L.marker(latlng, { icon: createSatelliteIcon(satellites[satid]) }).addTo(map);
-                    marker.bindPopup(createPopupContent(satellites[satid], position));
-                    marker.on('click', () => fetchDetailedInfo(satid));
-                    markers[satid] = marker;
-                    initPathLine(satid, latlng);
-                }
+    for (const satid of Object.keys(satellites).slice(0, satelliteLimit)) {
+        try {
+            const data = await fetchWithRetry(`/api/satellite/${satid}`);
+            console.log('Received position data for satellite:', satid, data);
+            if (!data.positions || data.positions.length === 0) {
+                console.error('No position data received for satellite:', satid);
+                continue;
+            }
+            const position = data.positions[0];
+            const latlng = [position.satlatitude, position.satlongitude];
+            
+            if (markers[satid]) {
+                console.log('Updating existing marker for satellite:', satid);
+                markers[satid].setLatLng(latlng);
+                markers[satid].getPopup().setContent(createPopupContent(satellites[satid], position));
+                updatePathLine(satid, latlng);
+            } else {
+                console.log('Creating new marker for satellite:', satid);
+                const marker = L.marker(latlng, { icon: createSatelliteIcon(satellites[satid]) }).addTo(map);
+                marker.bindPopup(createPopupContent(satellites[satid], position));
+                marker.on('click', () => fetchDetailedInfo(satid));
+                markers[satid] = marker;
+                initPathLine(satid, latlng);
+            }
 
-                // Fetch and update trajectory
-                updateTrajectory(satid);
-            })
-            .catch(error => {
-                console.error('Error updating satellite position:', satid, error);
-                displayErrorMessage(`Error updating satellite position: ${error.message}`);
-            });
-    });
+            // Fetch and update trajectory
+            updateTrajectory(satid);
+        } catch (error) {
+            console.error('Error updating satellite position:', satid, error);
+            displayErrorMessage(`Error updating satellite position: ${error.message}`);
+        }
+    }
 }
 
 function createPopupContent(satellite, position) {
@@ -82,23 +78,16 @@ function createPopupContent(satellite, position) {
     `;
 }
 
-function fetchDetailedInfo(satid) {
+async function fetchDetailedInfo(satid) {
     console.log('Fetching detailed info for satellite:', satid);
-    fetch(`/api/satellite/${satid}/info`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Received detailed info for satellite:', satid, data);
-            updatePopupWithDetailedInfo(satid, data);
-        })
-        .catch(error => {
-            console.error('Error fetching detailed satellite info:', satid, error);
-            displayErrorMessage(`Error fetching detailed satellite info: ${error.message}`);
-        });
+    try {
+        const data = await fetchWithRetry(`/api/satellite/${satid}/info`);
+        console.log('Received detailed info for satellite:', satid, data);
+        updatePopupWithDetailedInfo(satid, data);
+    } catch (error) {
+        console.error('Error fetching detailed satellite info:', satid, error);
+        displayErrorMessage(`Error fetching detailed satellite info: ${error.message}`);
+    }
 }
 
 function updatePopupWithDetailedInfo(satid, data) {
@@ -126,36 +115,29 @@ function updatePathLine(satid, latlng) {
     }
 }
 
-function updateTrajectory(satid) {
+async function updateTrajectory(satid) {
     console.log('Updating trajectory for satellite:', satid);
-    fetch(`/api/satellite/${satid}/trajectory?seconds=300`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Received trajectory data for satellite:', satid, data);
-            if (!data.positions || data.positions.length === 0) {
-                console.error('No trajectory data received for satellite:', satid);
-                return;
-            }
+    try {
+        const data = await fetchWithRetry(`/api/satellite/${satid}/trajectory?seconds=300`);
+        console.log('Received trajectory data for satellite:', satid, data);
+        if (!data.positions || data.positions.length === 0) {
+            console.error('No trajectory data received for satellite:', satid);
+            return;
+        }
 
-            const trajectoryPoints = data.positions.map(pos => [pos.satlatitude, pos.satlongitude]);
+        const trajectoryPoints = data.positions.map(pos => [pos.satlatitude, pos.satlongitude]);
 
-            if (trajectoryLines[satid]) {
-                console.log('Updating existing trajectory line for satellite:', satid);
-                trajectoryLines[satid].setLatLngs(trajectoryPoints);
-            } else {
-                console.log('Creating new trajectory line for satellite:', satid);
-                trajectoryLines[satid] = L.polyline(trajectoryPoints, {color: getRandomColor(), weight: 2, opacity: 0.7, dashArray: '5, 5'}).addTo(map);
-            }
-        })
-        .catch(error => {
-            console.error('Error updating satellite trajectory:', satid, error);
-            displayErrorMessage(`Error updating satellite trajectory: ${error.message}`);
-        });
+        if (trajectoryLines[satid]) {
+            console.log('Updating existing trajectory line for satellite:', satid);
+            trajectoryLines[satid].setLatLngs(trajectoryPoints);
+        } else {
+            console.log('Creating new trajectory line for satellite:', satid);
+            trajectoryLines[satid] = L.polyline(trajectoryPoints, {color: getRandomColor(), weight: 2, opacity: 0.7, dashArray: '5, 5'}).addTo(map);
+        }
+    } catch (error) {
+        console.error('Error updating satellite trajectory:', satid, error);
+        displayErrorMessage(`Error updating satellite trajectory: ${error.message}`);
+    }
 }
 
 function getRandomColor() {
@@ -167,76 +149,62 @@ function getRandomColor() {
     return color;
 }
 
-function fetchSatellites(category) {
+async function fetchSatellites(category) {
     console.log('Fetching satellites for category:', category);
-    fetch(`/api/satellites/${category}?limit=${satelliteLimit}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Received raw satellite data:', JSON.stringify(data));
-            if (data.above && data.above.length > 0) {
-                console.log('Number of satellites received:', data.above.length);
-                satellites = {};
-                Object.keys(markers).forEach(satid => {
-                    console.log('Removing existing marker for satellite:', satid);
-                    map.removeLayer(markers[satid]);
-                    delete markers[satid];
-                });
-                Object.keys(pathLines).forEach(satid => {
-                    console.log('Removing existing path line for satellite:', satid);
-                    map.removeLayer(pathLines[satid]);
-                    delete pathLines[satid];
-                });
-                Object.keys(trajectoryLines).forEach(satid => {
-                    console.log('Removing existing trajectory line for satellite:', satid);
-                    map.removeLayer(trajectoryLines[satid]);
-                    delete trajectoryLines[satid];
-                });
+    try {
+        const data = await fetchWithRetry(`/api/satellites/${category}?limit=${satelliteLimit}`);
+        console.log('Received raw satellite data:', JSON.stringify(data));
+        if (data.above && data.above.length > 0) {
+            console.log('Number of satellites received:', data.above.length);
+            satellites = {};
+            Object.keys(markers).forEach(satid => {
+                console.log('Removing existing marker for satellite:', satid);
+                map.removeLayer(markers[satid]);
+                delete markers[satid];
+            });
+            Object.keys(pathLines).forEach(satid => {
+                console.log('Removing existing path line for satellite:', satid);
+                map.removeLayer(pathLines[satid]);
+                delete pathLines[satid];
+            });
+            Object.keys(trajectoryLines).forEach(satid => {
+                console.log('Removing existing trajectory line for satellite:', satid);
+                map.removeLayer(trajectoryLines[satid]);
+                delete trajectoryLines[satid];
+            });
 
-                data.above.forEach(satellite => {
-                    console.log('Adding satellite to tracking:', satellite.satname);
-                    satellites[satellite.satid] = satellite;
-                });
+            data.above.forEach(satellite => {
+                console.log('Adding satellite to tracking:', satellite.satname);
+                satellites[satellite.satid] = satellite;
+            });
 
-                updateSatellitePositions();
-            } else {
-                console.error('No satellite data received or empty data');
-                displayErrorMessage('No satellite data received. Please try again later.');
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching satellites:', error);
-            displayErrorMessage(`Error fetching satellites: ${error.message}`);
-        });
+            updateSatellitePositions();
+        } else {
+            console.error('No satellite data received or empty data');
+            displayErrorMessage('No satellite data received. Please try again later.');
+        }
+    } catch (error) {
+        console.error('Error fetching satellites:', error);
+        displayErrorMessage(`Error fetching satellites: ${error.message}`);
+    }
 }
 
-function populateCategories() {
+async function populateCategories() {
     console.log('Populating categories');
     const categorySelect = document.getElementById('category');
-    fetch('/api/categories')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(categories => {
-            console.log('Received categories:', categories);
-            categories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.id;
-                option.textContent = category.name;
-                categorySelect.appendChild(option);
-            });
-        })
-        .catch(error => {
-            console.error('Error fetching categories:', error);
-            displayErrorMessage(`Error fetching categories: ${error.message}`);
+    try {
+        const categories = await fetchWithRetry('/api/categories');
+        console.log('Received categories:', categories);
+        categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = category.name;
+            categorySelect.appendChild(option);
         });
+    } catch (error) {
+        console.error('Error fetching categories:', error);
+        displayErrorMessage(`Error fetching categories: ${error.message}`);
+    }
 }
 
 function displayErrorMessage(message) {
@@ -252,6 +220,30 @@ function displayErrorMessage(message) {
         document.getElementById('app').prepend(newErrorContainer);
     }
     document.getElementById('error-container').textContent = message;
+}
+
+async function fetchWithRetry(url, retryCount = 0) {
+    try {
+        const response = await fetch(url);
+        if (response.status === 429) {
+            if (retryCount < maxRetries) {
+                const delay = Math.pow(2, retryCount) * baseDelay;
+                console.log(`Rate limit hit. Retrying in ${delay/1000} seconds...`);
+                displayErrorMessage(`Rate limit exceeded. Retrying in ${delay/1000} seconds...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return fetchWithRetry(url, retryCount + 1);
+            } else {
+                throw new Error('Max retries reached. Please try again later.');
+            }
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
