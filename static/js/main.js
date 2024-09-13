@@ -254,6 +254,59 @@ function displayErrorMessage(message) {
     document.getElementById('error-container').textContent = message;
 }
 
+function searchSatellites() {
+    const searchInput = document.getElementById('search');
+    const query = searchInput.value.trim();
+    
+    if (!query) {
+        displayErrorMessage('Please enter a search query');
+        return;
+    }
+
+    console.log('Searching satellites with query:', query);
+    fetch(`/api/search?query=${encodeURIComponent(query)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Search results:', data);
+            if (data.above && data.above.length > 0) {
+                satellites = {};
+                Object.keys(markers).forEach(satid => {
+                    console.log('Removing existing marker for satellite:', satid);
+                    map.removeLayer(markers[satid]);
+                    delete markers[satid];
+                });
+                Object.keys(pathLines).forEach(satid => {
+                    console.log('Removing existing path line for satellite:', satid);
+                    map.removeLayer(pathLines[satid]);
+                    delete pathLines[satid];
+                });
+                Object.keys(trajectoryLines).forEach(satid => {
+                    console.log('Removing existing trajectory line for satellite:', satid);
+                    map.removeLayer(trajectoryLines[satid]);
+                    delete trajectoryLines[satid];
+                });
+
+                data.above.forEach(satellite => {
+                    console.log('Adding satellite to tracking:', satellite.satname);
+                    satellites[satellite.satid] = satellite;
+                });
+
+                updateSatellitePositions();
+            } else {
+                displayErrorMessage('No satellites found matching the search query.');
+            }
+        })
+        .catch(error => {
+            console.error('Error searching satellites:', error);
+            displayErrorMessage(`Error searching satellites: ${error.message}`);
+        });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM content loaded');
     initMap();
@@ -268,6 +321,16 @@ document.addEventListener('DOMContentLoaded', () => {
     limitInput.addEventListener('change', (event) => {
         satelliteLimit = parseInt(event.target.value) || 5;
         fetchSatellites(categorySelect.value);
+    });
+
+    const searchButton = document.getElementById('search-button');
+    searchButton.addEventListener('click', searchSatellites);
+
+    const searchInput = document.getElementById('search');
+    searchInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            searchSatellites();
+        }
     });
 
     fetchSatellites(0);

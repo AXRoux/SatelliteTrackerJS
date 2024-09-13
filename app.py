@@ -90,5 +90,23 @@ def get_categories():
     app.logger.info(f"Returning categories: {json.dumps(categories)}")
     return jsonify(categories)
 
+@app.route('/api/search')
+def search_satellites():
+    query = request.args.get('query', '').strip()
+    if not query:
+        return jsonify({"error": "Search query is required"}), 400
+
+    url = f"https://api.n2yo.com/rest/v1/satellite/search/{query}/&apiKey={app.config['N2YO_API_KEY']}"
+    app.logger.debug(f"Searching satellites with URL: {url}")
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        app.logger.info(f"Search results: {json.dumps(data)}")
+        return jsonify(data)
+    except requests.RequestException as e:
+        app.logger.error(f"Error searching satellites: {str(e)}")
+        return jsonify({"error": "Failed to search satellites"}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

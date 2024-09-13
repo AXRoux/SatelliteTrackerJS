@@ -23,10 +23,25 @@ h1 {
     justify-content: center;
     align-items: center;
     margin-bottom: 10px;
+    flex-wrap: wrap;
 }
 
-#category {
-    margin-left: 10px;
+#category, #satellite-limit, #search {
+    margin: 5px;
+    padding: 5px;
+}
+
+#search-button {
+    margin: 5px;
+    padding: 5px 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+#search-button:hover {
+    background-color: #45a049;
 }
 
 #map {
@@ -55,6 +70,11 @@ h1 {
     margin-top: 2px;
 }
 
+#error-container {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
 @media (max-width: 600px) {
     h1 {
         font-size: 1.5em;
@@ -64,8 +84,8 @@ h1 {
         flex-direction: column;
     }
 
-    #category {
-        margin-left: 0;
-        margin-top: 5px;
+    #category, #satellite-limit, #search, #search-button {
+        width: 90%;
+        margin: 5px 0;
     }
 }
