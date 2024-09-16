@@ -28,6 +28,10 @@ This is a long-term aerospace reconnaissance project that aims to provide real-t
 - Flask
 - Leaflet.js
 - N2YO API
+- Nix
+- HTML
+- CSS
+- Javascript
 
 ## Setup and Installation
 1. Clone the repository
